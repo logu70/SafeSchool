@@ -23,6 +23,7 @@ const CONFIG = {
         evacuated: '#22c55e',
         injured: '#f97316',
         trapped: '#ef4444',
+        panicking: '#FF00FF',
         fire: 'rgba(239,68,68,0.6)',
         debris: '#374151',
         wall: '#2d3748',
@@ -213,6 +214,7 @@ class Student {
         this.waitTime = 0;
         this.moveCounter = 0;
         this.history = [];
+        this.panicRetryCounter = 0;
     }
 
     startEvacuation() {
@@ -224,7 +226,7 @@ class Student {
             this.state = 'moving';
             this.waitTime = 0;
         } else {
-            this.checkTrapped();
+            this.checkTrappedOrPanic();
         }
     }
 
@@ -240,11 +242,45 @@ class Student {
             if (this.waitTime >= CONFIG.QUEUE_MAX_WAIT) this.reroute();
             return;
         }
+        if (this.state === 'panicking') {
+            this.panicMove();
+            return;
+        }
         const speed = this.state === 'injured' ? 0.5 : 1;
         this.moveCounter += speed;
         if (this.moveCounter >= 1) {
             this.moveCounter -= 1;
             this.move();
+        }
+    }
+
+    panicMove() {
+        const speed = this.state === 'injured' ? 0.5 : 1;
+        this.moveCounter += speed;
+        if (this.moveCounter >= 1) {
+            this.moveCounter -= 1;
+            const neighbors = [
+                { x: this.x + 1, y: this.y }, { x: this.x - 1, y: this.y },
+                { x: this.x, y: this.y + 1 }, { x: this.x, y: this.y - 1 }
+            ];
+            const walkableNeighbors = neighbors.filter(n => isWalkable(n.x, n.y));
+            if (walkableNeighbors.length > 0) {
+                const next = walkableNeighbors[Math.floor(Math.random() * walkableNeighbors.length)];
+                this.x = next.x;
+                this.y = next.y;
+                this.history.push({ x: this.x, y: this.y });
+                if (this.history.length > 10) this.history.shift();
+            }
+            this.panicRetryCounter++;
+            if (this.panicRetryCounter >= 5) {
+                this.panicRetryCounter = 0;
+                const result = findPathToNearestExit(this.x, this.y);
+                if (result) {
+                    this.path = result.path.slice(1);
+                    this.targetExit = result.exit;
+                    this.state = 'moving';
+                }
+            }
         }
     }
 
@@ -282,7 +318,7 @@ class Student {
             this.targetExit = result.exit;
             this.state = 'moving';
         } else {
-            this.checkTrapped();
+            this.checkTrappedOrPanic();
         }
     }
 
@@ -295,11 +331,22 @@ class Student {
         }
     }
 
-    checkTrapped() {
+    checkTrappedOrPanic() {
         const result = findPathToNearestExit(this.x, this.y);
         if (!result) {
-            this.state = 'trapped';
-            this.path = [];
+            const neighbors = [
+                { x: this.x + 1, y: this.y }, { x: this.x - 1, y: this.y },
+                { x: this.x, y: this.y + 1 }, { x: this.x, y: this.y - 1 }
+            ];
+            const hasWalkableNeighbor = neighbors.some(n => isWalkable(n.x, n.y));
+            if (hasWalkableNeighbor) {
+                this.state = 'panicking';
+                this.panicRetryCounter = 0;
+                this.path = [];
+            } else {
+                this.state = 'trapped';
+                this.path = [];
+            }
         }
     }
 
@@ -421,11 +468,11 @@ function tick() {
     updateHazards();
     for (const student of state.students) {
         student.update();
-        if (student.state === 'moving' || student.state === 'waiting') {
+        if (student.state === 'moving' || student.state === 'waiting' || student.state === 'panicking') {
             state.congestionMap[student.y][student.x]++;
         }
     }
-    const active = state.students.filter(s => s.state === 'seated' || s.state === 'moving' || s.state === 'waiting');
+    const active = state.students.filter(s => s.state === 'seated' || s.state === 'moving' || s.state === 'waiting' || s.state === 'panicking');
     if (active.length === 0 || state.tick >= CONFIG.MAX_TICKS) {
         endSimulation();
         return;
@@ -550,7 +597,7 @@ function calculateScore() {
     const total = state.students.length;
     const evacuated = state.students.filter(s => s.state === 'evacuated').length;
     const injured = state.students.filter(s => s.state === 'injured').length;
-    const trapped = state.students.filter(s => s.state === 'trapped').length;
+    const trapped = state.students.filter(s => s.state === 'trapped' || s.state === 'panicking').length;
     const baseScore = total > 0 ? (evacuated / total) * 100 : 0;
     const speedBonus = evacuated === total ? Math.max(0, 40 - state.tick / 5) : 0;
     const penalty = injured * 5 + trapped * 20;
@@ -571,6 +618,8 @@ function getSuggestions(result) {
     if (evacuationRate < 0.8) suggestions.push('Add more exits or reposition existing ones closer to seating areas.');
     if (result.injured > 0) suggestions.push('Injured students were too close to hazards. Place exits away from the danger zone.');
     if (result.trapped > 0) suggestions.push('Some students were trapped. Ensure multiple escape routes from all areas.');
+    const panickingCount = state.students.filter(s => s.state === 'panicking').length;
+    if (panickingCount > 0) suggestions.push('Students were panicking with no escape route. Always place at least one exit door.');
     const exitValues = Object.values(state.exitUsage);
     const totalUsage = exitValues.reduce((a, b) => a + b, 0);
     if (totalUsage > 0 && exitValues.some(u => u / totalUsage > 0.6)) suggestions.push('Distribute exits more evenly to balance evacuation flow.');
@@ -618,7 +667,7 @@ function showResults() {
 // UI CONTROLS
 // ───────────────────────────────────────────────────────────────────────────────
 function updateStats() {
-    const states = { seated: 0, moving: 0, waiting: 0, evacuated: 0, injured: 0, trapped: 0 };
+    const states = { seated: 0, moving: 0, waiting: 0, evacuated: 0, injured: 0, trapped: 0, panicking: 0 };
     for (const s of state.students) states[s.state]++;
     document.getElementById('statSeated').textContent = states.seated;
     document.getElementById('statMoving').textContent = states.moving;
@@ -626,6 +675,7 @@ function updateStats() {
     document.getElementById('statEvacuated').textContent = states.evacuated;
     document.getElementById('statInjured').textContent = states.injured;
     document.getElementById('statTrapped').textContent = states.trapped;
+    document.getElementById('statPanicking').textContent = states.panicking;
     document.getElementById('studentCount').textContent = `${state.students.filter(s => s.state !== 'evacuated').length}/${CONFIG.MAX_STUDENTS}`;
     document.getElementById('exitCount').textContent = state.grid.flat().filter(c => c === 'exit').length;
     document.getElementById('tickCount').textContent = state.tick;
@@ -758,6 +808,7 @@ document.getElementById('btnCloseModal').addEventListener('click', () => {
         student.waitTime = 0;
         student.moveCounter = 0;
         student.history = [];
+        state.grid[student.startY][student.startX] = 'chair';
     }
     state.activeHazards.fire = []; state.activeHazards.debris = [];
     for (let y = 0; y < CONFIG.GRID_HEIGHT; y++) {

@@ -291,6 +291,7 @@ body { display: flex; flex-direction: column; }
 
 .stat-value.injured { color: var(--accent-injured); }
 .stat-value.trapped { color: var(--accent-danger); }
+.stat-value.panicking { color: #FF00FF; }
 .stat-value.evacuated { color: var(--accent-safe); }
 
 /* LEGEND */
@@ -311,6 +312,7 @@ body { display: flex; flex-direction: column; }
 .dot-evacuated { background: #22c55e; }
 .dot-injured { background: #f97316; }
 .dot-trapped { background: #ef4444; }
+.dot-panicking { background: #FF00FF; }
 
 /* TOGGLE */
 .toggle-row {
