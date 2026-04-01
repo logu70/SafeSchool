@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SchoolSafe — Evacuation Simulator</title>
+    <link rel="stylesheet" href="schoolsafe.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-title">
+            <span>🏫</span>
+            <h1>SchoolSafe</h1>
+        </div>
+        <div class="header-controls">
+            <select class="preset-selector" id="presetSelector">
+                <option value="empty" selected>Empty Floor</option>
+                <option value="classroom">Classroom</option>
+                <option value="corridor">Corridor Layout</option>
+                <option value="gym">Gymnasium</option>
+            </select>
+            <button class="header-btn" id="btnReset">Reset Layout</button>
+        </div>
+    </div>
+    <div class="container">
+        <div class="game-panel">
+            <div class="game-header">
+                <h3>Floor Plan — 20×15 cells (~1.5m each)</h3>
+                <div class="zoom-info">Left:Place Tool | Right:Erase | Middle:Hazard | Drag:Wall</div>
+            </div>
+            <div class="game-canvas-wrapper">
+                <canvas id="gameCanvas" width="800" height="600"></canvas>
+            </div>
+            <div class="game-footer">
+                <div class="cell-info">
+                    <span>Students: <strong id="studentCount">0/60</strong></span>
+                    <span>Exits: <strong id="exitCount">0</strong></span>
+                    <span>Tick: <strong id="tickCount">0</strong>/300</span>
+                </div>
+                <div class="cell-info">
+                    <span id="simStatus">Ready</span>
+                </div>
+            </div>
+        </div>
+        <div class="control-panel">
+            <div class="control-section">
+                <h4>Simulation</h4>
+                <div class="playback-controls">
+                    <button class="btn-primary" id="btnPlay">▶ Play</button>
+                    <button class="btn-primary" id="btnPause" disabled>⏸ Pause</button>
+                </div>
+            </div>
+            <div class="control-section">
+                <h4>Speed</h4>
+                <div class="speed-selector">
+                    <button class="speed-btn active" data-speed="1">1×</button>
+                    <button class="speed-btn" data-speed="2">2×</button>
+                    <button class="speed-btn" data-speed="4">4×</button>
+                </div>
+            </div>
+            <div class="control-section">
+                <h4>Placement Tools</h4>
+                <div class="tool-palette">
+                    <button class="tool-btn active" data-tool="chair">🪑<span>Chair</span></button>
+                    <button class="tool-btn" data-tool="exit">🚪<span>Exit</span></button>
+                    <button class="tool-btn" data-tool="wall">🧱<span>Wall</span></button>
+                    <button class="tool-btn" data-tool="eraser">🧽<span>Eraser</span></button>
+                </div>
+                <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Tip: Hold drag to draw walls quickly</p>
+            </div>
+            <div class="control-section">
+                <h4>Hazard Triggers</h4>
+                <div class="hazard-controls">
+                    <button class="hazard-btn fire" data-hazard="fire">🔥<span>Fire</span></button>
+                    <button class="hazard-btn quake" data-hazard="quake">💥<span>Quake</span></button>
+                </div>
+                <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Place on map to activate at sim start</p>
+            </div>
+            <div class="control-section">
+                <h4>View Options</h4>
+                <div class="toggle-row">
+                    <span style="font-size:13px">Congestion Overlay</span>
+                    <div class="toggle-switch" id="congestionToggle"></div>
+                </div>
+            </div>
+            <div class="control-section">
+                <h4>Live Statistics</h4>
+                <div class="stats-grid">
+                    <div class="stat-box"><div class="stat-label">Seated</div><div class="stat-value" id="statSeated">0</div></div>
+                    <div class="stat-box"><div class="stat-label">Moving</div><div class="stat-value" id="statMoving">0</div></div>
+                    <div class="stat-box"><div class="stat-label">Evacuated</div><div class="stat-value evacuated" id="statEvacuated">0</div></div>
+                    <div class="stat-box"><div class="stat-label">Injured</div><div class="stat-value injured" id="statInjured">0</div></div>
+                    <div class="stat-box"><div class="stat-label">Trapped</div><div class="stat-value trapped" id="statTrapped">0</div></div>
+                    <div class="stat-box"><div class="stat-label">Waiting</div><div class="stat-value" id="statWaiting">0</div></div>
+                </div>
+            </div>
+            <div class="control-section">
+                <h4>Student States</h4>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot dot-seated"></div><span>Seated</span></div>
+                    <div class="legend-item"><div class="legend-dot dot-moving"></div><span>Moving</span></div>
+                    <div class="legend-item"><div class="legend-dot dot-waiting"></div><span>Waiting</span></div>
+                    <div class="legend-item"><div class="legend-dot dot-evacuated"></div><span>Evacuated</span></div>
+                    <div class="legend-item"><div class="legend-dot dot-injured"></div><span>Injured</span></div>
+                    <div class="legend-item"><div class="legend-dot dot-trapped"></div><span>Trapped</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="resultsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Simulation Complete</h2>
+                <div class="grade-badge" id="gradeBadge">A+</div>
+            </div>
+            <div class="score-breakdown" id="scoreBreakdown"></div>
+            <div class="stats-detail" id="statsDetail"></div>
+            <div class="suggestions-list" id="suggestionsList"></div>
+            <button class="btn-close" id="btnCloseModal">Close</button>
+        </div>
+    </div>
+    <script src="schoolsafe.js"></script>
+</body>
+</html>
