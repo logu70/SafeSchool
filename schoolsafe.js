@@ -52,6 +52,7 @@ const state = {
     lastTickTime: 0,
     animationId: null,
     congestionMap: [],
+    trailMap: [],
     exitUsage: {},
     maxStudentsReached: false
 };
@@ -75,6 +76,9 @@ function initGrid() {
         Array(CONFIG.GRID_WIDTH).fill('floor')
     );
     state.congestionMap = Array(CONFIG.GRID_HEIGHT).fill(null).map(() => 
+        Array(CONFIG.GRID_WIDTH).fill(0)
+    );
+    state.trailMap = Array(CONFIG.GRID_HEIGHT).fill(null).map(() => 
         Array(CONFIG.GRID_WIDTH).fill(0)
     );
 }
@@ -471,6 +475,10 @@ function tick() {
         if (student.state === 'moving' || student.state === 'waiting' || student.state === 'panicking') {
             state.congestionMap[student.y][student.x]++;
         }
+        if (student.state === 'moving' || student.state === 'panicking' || student.state === 'injured') {
+            const current = state.trailMap[student.y][student.x];
+            state.trailMap[student.y][student.x] = Math.min(0.6, current + 0.15);
+        }
     }
     const active = state.students.filter(s => s.state === 'seated' || s.state === 'moving' || s.state === 'waiting' || s.state === 'panicking');
     if (active.length === 0 || state.tick >= CONFIG.MAX_TICKS) {
@@ -542,6 +550,17 @@ function render() {
                     ctx.fillStyle = `rgba(239, 68, 68, ${Math.min(congestion * 0.2, 0.8)})`;
                     ctx.fillRect(x * CONFIG.CELL_SIZE, y * CONFIG.CELL_SIZE, CONFIG.CELL_SIZE, CONFIG.CELL_SIZE);
                 }
+            }
+        }
+    }
+    // Render student movement trail
+    for (let y = 0; y < CONFIG.GRID_HEIGHT; y++) {
+        for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
+            const trail = state.trailMap[y][x];
+            const cell = state.grid[y][x];
+            if (trail > 0 && cell !== 'wall' && cell !== 'fire' && cell !== 'debris') {
+                ctx.fillStyle = `rgba(99, 102, 241, ${trail * 0.25})`;
+                ctx.fillRect(x * CONFIG.CELL_SIZE, y * CONFIG.CELL_SIZE, CONFIG.CELL_SIZE, CONFIG.CELL_SIZE);
             }
         }
     }
@@ -660,7 +679,12 @@ function showResults() {
         ${exitStats}
     `;
     document.getElementById('suggestionsList').innerHTML = suggestions.map(s => `<div class="suggestion-item">${s}</div>`).join('');
-    document.getElementById('resultsModal').classList.add('show');
+    const modal = document.getElementById('resultsModal');
+    const modalContent = modal.querySelector('.modal-content');
+    modalContent.style.transform = 'none';
+    modalContent.style.left = '';
+    modalContent.style.top = '';
+    modal.classList.add('show');
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -816,6 +840,7 @@ document.getElementById('btnCloseModal').addEventListener('click', () => {
             if (state.grid[y][x] === 'fire' || state.grid[y][x] === 'debris') {
                 state.grid[y][x] = 'floor';
             }
+            state.trailMap[y][x] = 0;
         }
     }
     render();
@@ -956,3 +981,51 @@ resizeCanvas();
 loadPreset('empty');
 render();
 updateStats();
+
+// ───────────────────────────────────────────────────────────────────────────────
+// MODAL DRAG FUNCTIONALITY
+// ───────────────────────────────────────────────────────────────────────────────
+(function setupModalDrag() {
+    const modal = document.getElementById('resultsModal');
+    const modalContent = modal.querySelector('.modal-content');
+    const modalHeader = modal.querySelector('.modal-header');
+    
+    let isDragging = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    
+    modalHeader.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        const rect = modalContent.getBoundingClientRect();
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+        modalHeader.style.cursor = 'grabbing';
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const modalRect = modalContent.getBoundingClientRect();
+        
+        let newX = e.clientX - dragOffsetX;
+        let newY = e.clientY - dragOffsetY;
+        
+        // Clamp to viewport
+        newX = Math.max(0, Math.min(newX, viewportWidth - modalRect.width));
+        newY = Math.max(0, Math.min(newY, viewportHeight - modalRect.height));
+        
+        modalContent.style.position = 'fixed';
+        modalContent.style.left = newX + 'px';
+        modalContent.style.top = newY + 'px';
+        modalContent.style.transform = 'none';
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            modalHeader.style.cursor = 'grab';
+        }
+    });
+})();

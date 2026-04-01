@@ -373,7 +373,12 @@ body { display: flex; flex-direction: column; }
     box-shadow: var(--shadow-lg);
 }
 
-.modal-header { margin-bottom: 20px; }
+.modal-header {
+    margin-bottom: 20px;
+    cursor: grab;
+    user-select: none;
+}
+.modal-header:active { cursor: grabbing; }
 .modal-header h2 { font-size: 24px; font-weight: 700; color: var(--primary); margin-bottom: 8px; }
 
 .grade-badge {
